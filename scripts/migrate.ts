@@ -10,4 +10,4 @@ if (!adminUrl || !appUrl) {
 }
 
 await runMigrations(adminUrl, appUrl);
-console.log("Migrations applied; reservo_app role is ready.");
+console.log("Migrations applied; kalendo_app role is ready.");

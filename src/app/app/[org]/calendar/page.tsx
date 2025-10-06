@@ -3,14 +3,55 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/misc";
-import { formatDay, formatRangeLabel, localDateOf, localRange, parseDateParam, startOfWeek, todayIn, wallMinutes } from "@/lib/calendar";
+import {
+  formatDay,
+  formatRangeLabel,
+  localDateOf,
+  localRange,
+  parseDateParam,
+  startOfWeek,
+  todayIn,
+  wallMinutes,
+} from "@/lib/calendar";
+import { layoutLanes } from "@/lib/calendar-layout";
 import { cn } from "@/lib/utils";
 import { getOrgContext, readInOrg } from "@/server/context";
-import { formatTime } from "@/server/format";
+import { formatMoney, formatTime } from "@/server/format";
 import { type BookingRow, listBookings } from "@/server/services/bookings";
 import { listStaff } from "@/server/services/catalog";
 
+import { BookingPeek, type PeekBooking } from "./booking-peek";
+
 const HOUR_PX = 56;
+
+function toPeek(b: BookingRow, tz: string, currency: string): PeekBooking {
+  const minutes = Math.round((b.endsAt.getTime() - b.startsAt.getTime()) / 60_000);
+  return {
+    id: b.id,
+    status: b.status,
+    customerId: b.customerId,
+    customerName: b.customerName,
+    customerEmail: b.customerEmail,
+    serviceName: b.serviceName,
+    staffName: b.staffName,
+    staffColor: b.staffColor,
+    dateLabel: b.startsAt.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      timeZone: tz,
+    }),
+    timeLabel: `${formatTime(b.startsAt, tz)} - ${formatTime(b.endsAt, tz)}`,
+    durationLabel:
+      minutes >= 60
+        ? `${Math.floor(minutes / 60)} h ${minutes % 60 ? `${minutes % 60} min` : ""}`.trim()
+        : `${minutes} min`,
+    priceLabel: formatMoney(b.priceCents, currency),
+    depositLabel: b.depositCents > 0 ? formatMoney(b.depositCents, currency) : null,
+    notes: b.notes,
+    source: b.source === "public" ? "the booking page" : "the dashboard",
+  };
+}
 
 interface Positioned {
   booking: BookingRow;
@@ -20,28 +61,22 @@ interface Positioned {
   lanes: number;
 }
 
-/** Greedy lane assignment so overlapping bookings (different staff) sit side by side. */
 function layoutDay(rows: BookingRow[], tz: string, startHour: number): Positioned[] {
-  const items = rows
-    .map((b) => {
-      const start = wallMinutes(b.startsAt, tz);
-      const end = Math.max(start + 15, localDateOf(b.endsAt, tz) === localDateOf(b.startsAt, tz) ? wallMinutes(b.endsAt, tz) : 24 * 60);
-      return { booking: b, start, end };
-    })
-    .sort((a, b) => a.start - b.start);
-  const laneEnds: number[] = [];
-  const placed = items.map((it) => {
-    let lane = laneEnds.findIndex((end) => end <= it.start);
-    if (lane === -1) lane = laneEnds.push(it.end) - 1;
-    else laneEnds[lane] = it.end;
-    return { ...it, lane };
+  const timed = rows.map((booking) => {
+    const start = wallMinutes(booking.startsAt, tz);
+    const sameDay = localDateOf(booking.endsAt, tz) === localDateOf(booking.startsAt, tz);
+    return {
+      booking,
+      start,
+      end: Math.max(start + 15, sameDay ? wallMinutes(booking.endsAt, tz) : 24 * 60),
+    };
   });
-  return placed.map((p) => ({
-    booking: p.booking,
-    top: ((p.start - startHour * 60) / 60) * HOUR_PX,
-    height: Math.max(22, ((p.end - p.start) / 60) * HOUR_PX - 2),
-    lane: p.lane,
-    lanes: laneEnds.length,
+  return layoutLanes(timed).map(({ item, lane, lanes }) => ({
+    booking: item.booking,
+    top: ((item.start - startHour * 60) / 60) * HOUR_PX,
+    height: Math.max(22, ((item.end - item.start) / 60) * HOUR_PX - 2),
+    lane,
+    lanes,
   }));
 }
 
@@ -62,7 +97,12 @@ export default async function CalendarPage({
   const today = todayIn(tz).toString();
 
   const { bookings, staff } = await readInOrg(ctx, async (tx) => ({
-    bookings: await listBookings(tx, { from: range.start, to: range.end, staffId: sp.staff, statuses: ["confirmed", "pending_payment"] }),
+    bookings: await listBookings(tx, {
+      from: range.start,
+      to: range.end,
+      staffId: sp.staff,
+      statuses: ["confirmed", "pending_payment"],
+    }),
     staff: await listStaff(tx, { activeOnly: true }),
   }));
 
@@ -88,7 +128,10 @@ export default async function CalendarPage({
         actions={
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" asChild>
-              <Link href={link({ week: weekStart.subtract({ days: 7 }).toString() })} aria-label="Previous week">
+              <Link
+                href={link({ week: weekStart.subtract({ days: 7 }).toString() })}
+                aria-label="Previous week"
+              >
                 <ChevronLeft />
               </Link>
             </Button>
@@ -96,7 +139,10 @@ export default async function CalendarPage({
               <Link href={link({ week: today })}>Today</Link>
             </Button>
             <Button variant="outline" size="icon" asChild>
-              <Link href={link({ week: weekStart.add({ days: 7 }).toString() })} aria-label="Next week">
+              <Link
+                href={link({ week: weekStart.add({ days: 7 }).toString() })}
+                aria-label="Next week"
+              >
                 <ChevronRight />
               </Link>
             </Button>
@@ -107,7 +153,12 @@ export default async function CalendarPage({
       <div className="mb-4 flex flex-wrap gap-2">
         <Link
           href={link({ staff: null })}
-          className={cn("rounded-full border px-3 py-1 text-sm", !sp.staff ? "border-primary bg-accent text-accent-foreground" : "bg-card hover:bg-muted")}
+          className={cn(
+            "rounded-full border px-3 py-1 text-sm",
+            !sp.staff
+              ? "border-primary bg-accent text-accent-foreground"
+              : "bg-card hover:bg-muted",
+          )}
         >
           Everyone
         </Link>
@@ -117,7 +168,9 @@ export default async function CalendarPage({
             href={link({ staff: s.id })}
             className={cn(
               "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm",
-              sp.staff === s.id ? "border-primary bg-accent text-accent-foreground" : "bg-card hover:bg-muted",
+              sp.staff === s.id
+                ? "border-primary bg-accent text-accent-foreground"
+                : "bg-card hover:bg-muted",
             )}
           >
             <span className="size-2.5 rounded-full" style={{ backgroundColor: s.color }} />
@@ -126,7 +179,7 @@ export default async function CalendarPage({
         ))}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
+      <div className="bg-card overflow-x-auto rounded-xl border shadow-xs">
         <div className="grid min-w-[860px] grid-cols-[56px_repeat(7,1fr)]">
           <div className="border-b" />
           {days.map((d) => {
@@ -134,8 +187,13 @@ export default async function CalendarPage({
             const isToday = d.toString() === today;
             return (
               <div key={d.toString()} className="border-b border-l px-2 py-2 text-center">
-                <p className="text-xs text-muted-foreground uppercase">{f.weekday}</p>
-                <p className={cn("mx-auto mt-0.5 grid size-8 place-items-center rounded-full text-sm font-semibold", isToday && "bg-primary text-primary-foreground")}>
+                <p className="text-muted-foreground text-xs uppercase">{f.weekday}</p>
+                <p
+                  className={cn(
+                    "mx-auto mt-0.5 grid size-8 place-items-center rounded-full text-sm font-semibold",
+                    isToday && "bg-primary text-primary-foreground",
+                  )}
+                >
                   {f.day}
                 </p>
               </div>
@@ -144,43 +202,62 @@ export default async function CalendarPage({
 
           <div className="relative">
             {hours.map((h) => (
-              <div key={h} style={{ height: HOUR_PX }} className="pr-2 text-right text-[11px] text-muted-foreground tabular-nums">
-                <span className="relative -top-2">{String(h).padStart(2, "0")}:00</span>
+              <div
+                key={h}
+                style={{ height: HOUR_PX }}
+                className="text-muted-foreground pr-2 text-right text-[11px] tabular-nums"
+              >
+                <span className="relative -top-2">
+                  {h % 12 || 12} {h < 12 ? "AM" : "PM"}
+                </span>
               </div>
             ))}
           </div>
 
           {days.map((d) => {
-            const dayBookings = bookings.filter((b) => localDateOf(b.startsAt, tz) === d.toString());
+            const dayBookings = bookings.filter(
+              (b) => localDateOf(b.startsAt, tz) === d.toString(),
+            );
             return (
-              <div key={d.toString()} className="relative border-l" style={{ height: hours.length * HOUR_PX }}>
+              <div
+                key={d.toString()}
+                className="relative border-l"
+                style={{ height: hours.length * HOUR_PX }}
+              >
                 {hours.map((h) => (
-                  <div key={h} style={{ top: (h - startHour) * HOUR_PX }} className="absolute inset-x-0 border-t border-border/60" />
+                  <div
+                    key={h}
+                    style={{ top: (h - startHour) * HOUR_PX }}
+                    className="border-border/60 absolute inset-x-0 border-t"
+                  />
                 ))}
-                {layoutDay(dayBookings, tz, startHour).map(({ booking: b, top, height, lane, lanes }) => (
-                  <Link
-                    key={b.id}
-                    href={`/app/${slug}/bookings?focus=${b.id}`}
-                    title={`${b.customerName} · ${b.serviceName} · ${b.staffName}`}
-                    className={cn(
-                      "absolute overflow-hidden rounded-md border-l-[3px] px-1.5 py-1 text-[11px] leading-tight shadow-xs transition-shadow hover:shadow-md",
-                      b.status === "pending_payment" && "opacity-70 [background-image:repeating-linear-gradient(45deg,transparent_0_6px,rgb(0_0_0/0.04)_6px_12px)]",
-                    )}
-                    style={{
-                      top,
-                      height,
-                      left: `calc(${(lane / lanes) * 100}% + 2px)`,
-                      width: `calc(${100 / lanes}% - 4px)`,
-                      borderLeftColor: b.staffColor,
-                      backgroundColor: `color-mix(in oklch, ${b.staffColor} 14%, var(--card))`,
-                    }}
-                  >
-                    <p className="truncate font-semibold">{b.customerName}</p>
-                    <p className="truncate text-muted-foreground">
-                      {formatTime(b.startsAt, tz)} · {b.serviceName}
-                    </p>
-                  </Link>
-                ))}
+                {layoutDay(dayBookings, tz, startHour).map(
+                  ({ booking: b, top, height, lane, lanes }) => (
+                    <BookingPeek
+                      key={b.id}
+                      orgSlug={slug}
+                      booking={toPeek(b, tz, ctx.org.currency)}
+                      className={cn(
+                        "absolute cursor-pointer overflow-hidden rounded-md border-l-[3px] px-1.5 py-1 text-left text-[11px] leading-tight shadow-xs transition-shadow hover:shadow-md",
+                        b.status === "pending_payment" &&
+                          "[background-image:repeating-linear-gradient(45deg,transparent_0_6px,rgb(0_0_0/0.04)_6px_12px)] opacity-70",
+                      )}
+                      style={{
+                        top,
+                        height,
+                        left: `calc(${(lane / lanes) * 100}% + 2px)`,
+                        width: `calc(${100 / lanes}% - 4px)`,
+                        borderLeftColor: b.staffColor,
+                        backgroundColor: `color-mix(in oklch, ${b.staffColor} 14%, var(--card))`,
+                      }}
+                    >
+                      <p className="truncate font-semibold">{b.customerName}</p>
+                      <p className="text-muted-foreground truncate">
+                        {formatTime(b.startsAt, tz)} · {b.serviceName}
+                      </p>
+                    </BookingPeek>
+                  ),
+                )}
               </div>
             );
           })}

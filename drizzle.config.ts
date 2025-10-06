@@ -7,7 +7,7 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_ADMIN_URL ?? "postgres://postgres:postgres@localhost:5433/reservo",
+    url: process.env.DATABASE_ADMIN_URL ?? "postgres://postgres:postgres@localhost:5433/kalendo",
   },
   strict: true,
   verbose: true,

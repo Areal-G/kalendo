@@ -16,8 +16,8 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 -- -----------------------------------------------------------------------------
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'reservo_app') THEN
-    CREATE ROLE reservo_app NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kalendo_app') THEN
+    CREATE ROLE kalendo_app NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
   END IF;
 END
 $$;
@@ -32,9 +32,9 @@ $$;
 -- -----------------------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS app;
 --> statement-breakpoint
-GRANT USAGE ON SCHEMA app TO reservo_app;
+GRANT USAGE ON SCHEMA app TO kalendo_app;
 --> statement-breakpoint
-GRANT USAGE ON SCHEMA public TO reservo_app;
+GRANT USAGE ON SCHEMA public TO kalendo_app;
 --> statement-breakpoint
 
 CREATE FUNCTION app.current_org_id() RETURNS uuid
@@ -124,29 +124,29 @@ CREATE POLICY memberships_delete ON public.memberships FOR DELETE
 -- -----------------------------------------------------------------------------
 GRANT SELECT, INSERT, UPDATE, DELETE
   ON public.auth_users, public.auth_sessions, public.auth_accounts, public.auth_verifications
-  TO reservo_app;
+  TO kalendo_app;
 --> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE ON public.organizations TO reservo_app;
+GRANT SELECT, INSERT, UPDATE ON public.organizations TO kalendo_app;
 --> statement-breakpoint
 GRANT SELECT, INSERT, UPDATE, DELETE
   ON public.memberships, public.invitations, public.staff_members, public.services,
      public.staff_services, public.working_hours, public.breaks, public.date_overrides,
      public.time_off, public.holidays, public.customers, public.payments
-  TO reservo_app;
+  TO kalendo_app;
 --> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE ON public.bookings TO reservo_app;
+GRANT SELECT, INSERT, UPDATE ON public.bookings TO kalendo_app;
 --> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE ON public.outbox TO reservo_app;
+GRANT SELECT, INSERT, UPDATE ON public.outbox TO kalendo_app;
 --> statement-breakpoint
-GRANT USAGE ON SEQUENCE public.outbox_id_seq TO reservo_app;
+GRANT USAGE ON SEQUENCE public.outbox_id_seq TO kalendo_app;
 --> statement-breakpoint
-GRANT SELECT, INSERT ON public.audit_log TO reservo_app;
+GRANT SELECT, INSERT ON public.audit_log TO kalendo_app;
 --> statement-breakpoint
-GRANT USAGE ON SEQUENCE public.audit_log_id_seq TO reservo_app;
+GRANT USAGE ON SEQUENCE public.audit_log_id_seq TO kalendo_app;
 --> statement-breakpoint
-GRANT SELECT, INSERT ON public.webhook_events TO reservo_app;
+GRANT SELECT, INSERT ON public.webhook_events TO kalendo_app;
 --> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.rate_limits TO reservo_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.rate_limits TO kalendo_app;
 --> statement-breakpoint
 
 -- -----------------------------------------------------------------------------
@@ -169,7 +169,7 @@ ALTER TABLE public.bookings
 -- 6. SECURITY DEFINER entry points
 --    The only ways to cross the tenant boundary. Each one returns the minimum
 --    (an id, or rows claimed for processing), pins search_path to defeat
---    object-shadowing attacks, and is executable by reservo_app only.
+--    object-shadowing attacks, and is executable by kalendo_app only.
 --    They run as the migration owner, which must be a superuser or BYPASSRLS.
 -- -----------------------------------------------------------------------------
 
@@ -257,4 +257,4 @@ REVOKE ALL ON FUNCTION app.org_id_by_slug(text), app.invitation_org_id(text),
 GRANT EXECUTE ON FUNCTION app.org_id_by_slug(text), app.invitation_org_id(text),
   app.claim_outbox(integer, integer), app.dead_letter_exhausted_outbox(), app.expire_stale_holds(),
   app.current_org_id(), app.current_user_id()
-  TO reservo_app;
+  TO kalendo_app;
