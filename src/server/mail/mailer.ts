@@ -74,18 +74,18 @@ function createMailer(): Mailer {
       host: process.env.SMTP_HOST ?? "localhost",
       port: Number(process.env.SMTP_PORT ?? 1025),
     },
-    process.env.EMAIL_FROM ?? "Reservo <no-reply@reservo.local>",
+    process.env.EMAIL_FROM ?? "Kalendo <no-reply@kalendo.local>",
   );
 }
 
-const globalForMail = globalThis as unknown as { __reservoMailer?: Mailer };
+const globalForMail = globalThis as unknown as { __kalendoMailer?: Mailer };
 
 export function getMailer(): Mailer {
-  globalForMail.__reservoMailer ??= createMailer();
-  return globalForMail.__reservoMailer;
+  globalForMail.__kalendoMailer ??= createMailer();
+  return globalForMail.__kalendoMailer;
 }
 
 /** Test hook. */
 export function setMailer(mailer: Mailer): void {
-  globalForMail.__reservoMailer = mailer;
+  globalForMail.__kalendoMailer = mailer;
 }
