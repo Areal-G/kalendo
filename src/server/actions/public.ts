@@ -10,7 +10,6 @@ import { bookings, payments } from "@/db/schema";
 import { orgIdBySlug, withTenant } from "../db/tenant";
 import { AppError, notFound } from "../errors";
 import { clientIp } from "../http";
-import { drainOutboxAfterResponse } from "../outbox/drain";
 import { getPaymentProvider } from "../payments";
 import { isFakeProvider } from "../payments/fake";
 import { handleWebhook } from "../payments/webhooks";
@@ -38,7 +37,6 @@ export async function cancelPublicBookingAction(
       if (!found) throw notFound("Booking");
       await cancelBooking(tx, { bookingId: found.booking.id, by: "customer", actorUserId: null });
     });
-    drainOutboxAfterResponse();
     return { ok: true, data: undefined };
   } catch (err) {
     return toActionError(err);
@@ -81,7 +79,6 @@ export async function payFakeCheckoutAction(
       externalId: found.externalId,
     });
     await handleWebhook(provider, body, signature);
-    drainOutboxAfterResponse();
   } catch (err) {
     return toActionError(err);
   }

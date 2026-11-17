@@ -7,7 +7,6 @@ import { authAccounts, authSessions, authUsers, authVerifications } from "@/db/s
 import { env } from "@/env";
 
 import { getDb } from "../db/client";
-import { isDemoMode } from "../demo/mode";
 import { getMailer } from "../mail/mailer";
 import { magicLinkEmail } from "../mail/templates";
 
@@ -17,18 +16,6 @@ function createAuth() {
     appName: "Kalendo",
     secret: config.BETTER_AUTH_SECRET,
     baseURL: config.BETTER_AUTH_URL,
-    // In the public demo everyone shares one account: nobody gets to lock the
-    // others out by changing its password or email (the app has no UI for these).
-    disabledPaths: isDemoMode()
-      ? [
-          "/change-password",
-          "/change-email",
-          "/update-user",
-          "/delete-user",
-          "/revoke-sessions",
-          "/revoke-other-sessions",
-        ]
-      : [],
     database: drizzleAdapter(getDb(), {
       provider: "pg",
       schema: {

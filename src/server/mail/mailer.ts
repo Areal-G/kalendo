@@ -1,7 +1,5 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
-import { isDemoMode } from "../demo/mode";
-
 export interface EmailMessage {
   to: string;
   subject: string;
@@ -47,8 +45,8 @@ export class MemoryMailer implements Mailer {
 }
 
 /**
- * Logs a one-line summary and drops the message. The public demo uses it so
- * fictional addresses never receive real email (and no SMTP is needed).
+ * Logs a one-line summary and drops the message, so no address receives real
+ * email and no SMTP server is needed.
  */
 export class LogMailer implements Mailer {
   async send(message: EmailMessage): Promise<void> {
@@ -62,11 +60,10 @@ function maskEmail(email: string): string {
 }
 
 /**
- * `MAIL_TRANSPORT`: `smtp` (default), `memory` (tests) or `log`. Demo mode
- * defaults to `log`; set `MAIL_TRANSPORT=smtp` to send to Mailpit instead.
+ * `MAIL_TRANSPORT`: `smtp` (default), `memory` (tests) or `log`.
  */
 function createMailer(): Mailer {
-  const transport = process.env.MAIL_TRANSPORT || (isDemoMode() ? "log" : "smtp");
+  const transport = process.env.MAIL_TRANSPORT || "smtp";
   if (transport === "memory") return new MemoryMailer();
   if (transport === "log") return new LogMailer();
   return new SmtpMailer(

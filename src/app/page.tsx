@@ -12,9 +12,7 @@ import {
 import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
-import { DemoSignInButton } from "@/components/demo/demo-sign-in-button";
 import { Button } from "@/components/ui/button";
-import { isDemoMode } from "@/server/demo/mode";
 
 const nav = [
   { href: "#features", label: "Features" },
@@ -125,22 +123,10 @@ const faqs = [
     q: "Can my staff have their own logins?",
     a: "Yes. Invite them by email as staff or admin. Staff see their own calendar; owners and admins manage everything.",
   },
-  {
-    q: "Can I try it before signing up?",
-    a: "Yes. The demo signs you straight into a sample salon with real-looking bookings, customers and team, so you can click through everything.",
-  },
 ];
 
-function TryDemo({
-  size = "lg",
-  label = "Try the demo",
-}: {
-  size?: "sm" | "default" | "lg";
-  label?: string;
-}) {
-  return isDemoMode() ? (
-    <DemoSignInButton size={size}>{label}</DemoSignInButton>
-  ) : (
+function GetStarted({ size = "lg" }: { size?: "sm" | "default" | "lg" }) {
+  return (
     <Button size={size} asChild>
       <Link href="/sign-up">
         Get started free <ArrowRight />
@@ -252,7 +238,7 @@ export default function LandingPage() {
           <Button variant="outline" size="sm" asChild>
             <Link href="/sign-in">Sign in</Link>
           </Button>
-          <TryDemo size="sm" />
+          <GetStarted size="sm" />
         </div>
       </aside>
 
@@ -285,15 +271,11 @@ export default function LandingPage() {
                 deposits that stop no-shows and reminders that send themselves.
               </p>
               <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <TryDemo />
+                <GetStarted />
                 <Button size="lg" variant="outline" asChild>
                   <a href="#features">See how it works</a>
                 </Button>
               </div>
-              <p className="text-muted-foreground mt-4 text-xs">
-                No sign-up needed for the demo. Explore a fully stocked sample business in one
-                click.
-              </p>
               <div className="mt-16">
                 <ProductPreview />
               </div>
@@ -477,21 +459,15 @@ export default function LandingPage() {
                 See your week fill up, not your phone log
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-[15px] text-white/80">
-                Click through a sample business with real-looking bookings, customers and team. No
-                sign-up, no credit card.
+                Add your services and opening hours, share your booking page and let customers book
+                themselves. No credit card.
               </p>
               <div className="mt-8 flex justify-center">
-                {isDemoMode() ? (
-                  <DemoSignInButton size="lg" variant="outline" className="text-foreground">
-                    Try the demo
-                  </DemoSignInButton>
-                ) : (
-                  <Button size="lg" variant="outline" className="text-foreground" asChild>
-                    <Link href="/sign-up">
-                      Get started free <ArrowRight />
-                    </Link>
-                  </Button>
-                )}
+                <Button size="lg" variant="outline" className="text-foreground" asChild>
+                  <Link href="/sign-up">
+                    Get started free <ArrowRight />
+                  </Link>
+                </Button>
               </div>
             </section>
           </main>

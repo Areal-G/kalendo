@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -17,20 +17,13 @@ function safeNext(value: string | null): string {
   return value && value.startsWith("/") && !value.startsWith("//") ? value : "/app";
 }
 
-const DEMO_ERRORS: Record<string, string> = {
-  unavailable: "The demo account isn't available right now. It's restored every night.",
-  busy: "Too many demo sign-ins from your network. Try again in a few minutes.",
-};
-
-export function AuthForm({ mode, demo = false }: { mode: "sign-in" | "sign-up"; demo?: boolean }) {
+export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNext(params.get("next"));
   const [pending, startTransition] = useTransition();
   const [magicSent, setMagicSent] = useState(false);
-  const [error, setError] = useState<string | null>(
-    () => DEMO_ERRORS[params.get("demo") ?? ""] ?? null,
-  );
+  const [error, setError] = useState<string | null>(null);
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -78,22 +71,6 @@ export function AuthForm({ mode, demo = false }: { mode: "sign-in" | "sign-up"; 
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
-        {demo ? (
-          <form
-            action="/api/demo/sign-in"
-            method="post"
-            className="bg-accent text-accent-foreground grid gap-2 rounded-lg p-3 text-sm"
-          >
-            <p>
-              {mode === "sign-up"
-                ? "Live demo: accounts you create here are wiped every night."
-                : "Just looking around? Skip the form."}
-            </p>
-            <Button type="submit">
-              Sign in as the demo owner <ArrowRight />
-            </Button>
-          </form>
-        ) : null}
         <form action={onSubmit} className="grid gap-4">
           {mode === "sign-up" ? (
             <Field label="Your name" htmlFor="name">
@@ -130,7 +107,7 @@ export function AuthForm({ mode, demo = false }: { mode: "sign-in" | "sign-up"; 
           </Button>
         </form>
 
-        {mode === "sign-in" && !demo ? (
+        {mode === "sign-in" ? (
           <>
             <div className="text-muted-foreground flex items-center gap-3 text-xs">
               <span className="bg-border h-px flex-1" /> or{" "}

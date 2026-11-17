@@ -1,10 +1,10 @@
 /**
- * Demo data: two fictional businesses with staff, services, schedules,
- * customers and a few weeks of bookings. Everything goes through the real
- * services (and therefore through RLS and the availability engine), so the
- * seed doubles as a smoke test of the write path.
+ * Sample data: two fictional businesses with staff, services, schedules,
+ * customers and a few weeks of bookings, both owned by one login. Everything
+ * goes through the real services (and therefore through RLS and the
+ * availability engine), so the seed doubles as a smoke test of the write path.
  *
- * Used by `npm run seed` and by the nightly demo reset (`/api/demo/reset`).
+ * Used by `npm run seed`.
  */
 import { eq } from "drizzle-orm";
 import type { Sql } from "postgres";
@@ -13,7 +13,6 @@ import { Temporal } from "temporal-polyfill";
 import {
   breaks,
   holidays,
-  memberships,
   organizations,
   services,
   staffMembers,
@@ -28,8 +27,6 @@ import { loadAvailabilityQuery } from "@/server/services/availability";
 import { loadOrg, reserveSlot } from "@/server/services/bookings";
 import { createOrganization } from "@/server/services/organizations";
 
-import { DEMO_ADMIN_EMAIL, DEMO_ORG_SLUG, DEMO_OWNER_EMAIL, DEMO_PASSWORD } from "./mode";
-
 // Small deterministic PRNG so every seed run produces the same calendar.
 function mulberry32(seed: number) {
   return () => {
@@ -40,7 +37,7 @@ function mulberry32(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-// Re-created on every run so a warm serverless instance reseeds identically.
+// Re-created on every run so each seed produces the same calendar.
 let random = mulberry32(20261014);
 const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
 
@@ -111,11 +108,6 @@ const makeCustomers = () =>
     };
   });
 
-async function createUser(name: string, email: string) {
-  const res = await getAuth().api.signUpEmail({ body: { name, email, password: DEMO_PASSWORD } });
-  return { id: res.user.id, name, email };
-}
-
 type Hours = { weekday: number; start: string; end: string }[];
 const days = (list: number[], start: string, end: string): Hours =>
   list.map((weekday) => ({ weekday, start, end }));
@@ -125,8 +117,8 @@ interface OrgSpec {
   slug: string;
   timeZone: string;
   currency: "usd" | "eur" | "ars";
-  owner: { name: string; email: string; color: string; hours: Hours; breaks: Hours };
-  admin?: { name: string; email: string };
+  /** The seed owner's own working hours in this business. */
+  owner: { color: string; hours: Hours; breaks: Hours };
   staff: { name: string; color: string; hours: Hours; breaks: Hours }[];
   services: {
     name: string;
@@ -143,17 +135,14 @@ interface OrgSpec {
 const SPECS: OrgSpec[] = [
   {
     name: "Glow Studio",
-    slug: DEMO_ORG_SLUG,
+    slug: "glow-studio",
     timeZone: "America/New_York",
     currency: "usd",
     owner: {
-      name: "Emily Carter",
-      email: DEMO_OWNER_EMAIL,
       color: "#8b5cf6",
       hours: days([2, 3, 4, 5, 6], "10:00", "19:00"),
       breaks: days([2, 3, 4, 5, 6], "14:00", "15:00"),
     },
-    admin: { name: "Jessica Morgan", email: DEMO_ADMIN_EMAIL },
     staff: [
       {
         name: "Ryan Brooks",
@@ -210,8 +199,6 @@ const SPECS: OrgSpec[] = [
     timeZone: "America/Chicago",
     currency: "usd",
     owner: {
-      name: "Michael Harris",
-      email: "physio@kalendo.dev",
       color: "#10b981",
       hours: days([1, 2, 3, 4, 5], "08:00", "16:00"),
       breaks: [],
@@ -246,15 +233,17 @@ const SPECS: OrgSpec[] = [
   },
 ];
 
-async function seedOrg(spec: OrgSpec, customers: ReturnType<typeof makeCustomers>) {
-  const owner = await createUser(spec.owner.name, spec.owner.email);
+async function seedOrg(
+  spec: OrgSpec,
+  owner: { id: string; name: string; email: string },
+  customers: ReturnType<typeof makeCustomers>,
+) {
   const { id: orgId } = await createOrganization(owner, {
     name: spec.name,
     slug: spec.slug,
     timeZone: spec.timeZone,
     currency: spec.currency,
   });
-  const admin = spec.admin ? await createUser(spec.admin.name, spec.admin.email) : null;
 
   await withTenant({ orgId, userId: owner.id }, async (tx) => {
     await tx
@@ -269,7 +258,6 @@ async function seedOrg(spec: OrgSpec, customers: ReturnType<typeof makeCustomers
       .update(staffMembers)
       .set({ color: spec.owner.color })
       .where(eq(staffMembers.id, ownerStaff!.id));
-    if (admin) await tx.insert(memberships).values({ orgId, userId: admin.id, role: "admin" });
 
     const ids = [ownerStaff!.id];
     for (const s of spec.staff) {
@@ -380,28 +368,40 @@ async function seedOrg(spec: OrgSpec, customers: ReturnType<typeof makeCustomers
   return { orgId, created };
 }
 
+export interface SeedOwner {
+  name: string;
+  email: string;
+  password: string;
+}
+
 export interface SeedResult {
   seeded: boolean;
   orgs: { name: string; slug: string; bookings: number }[];
 }
 
 /**
- * Seeds the demo tenants unless the demo owner already exists. `admin` is a
- * privileged connection (migration owner): it is only used to check for
- * existing data and to mark seed-time outbox messages as handled.
+ * Creates the owner account and the sample businesses, unless that account
+ * already exists, and never touches other data. `admin` is a privileged
+ * connection (migration owner): it is only used to check for existing data and
+ * to mark seed-time outbox messages as handled.
  */
-export async function seedDemoData(admin: Sql): Promise<SeedResult> {
-  const existing = await admin`select 1 from auth_users where email = ${DEMO_OWNER_EMAIL}`;
+export async function seedSampleData(admin: Sql, owner: SeedOwner): Promise<SeedResult> {
+  const existing = await admin`select 1 from auth_users where email = ${owner.email}`;
   if (existing.length > 0) return { seeded: false, orgs: [] };
 
+  const { user } = await getAuth().api.signUpEmail({ body: owner });
   random = mulberry32(20261014);
   const customers = makeCustomers();
   const orgs: SeedResult["orgs"] = [];
+  const orgIds: string[] = [];
   for (const spec of SPECS) {
-    const { created } = await seedOrg(spec, customers);
+    const { orgId, created } = await seedOrg(spec, user, customers);
     orgs.push({ name: spec.name, slug: spec.slug, bookings: created });
+    orgIds.push(orgId);
   }
   // Don't email fictional customers about historical bookings.
-  await admin`update outbox set status = 'done', processed_at = now(), last_error = 'skipped by seed'`;
+  await admin`
+    update outbox set status = 'done', processed_at = now(), last_error = 'skipped by seed'
+    where org_id in ${admin(orgIds)}`;
   return { seeded: true, orgs };
 }

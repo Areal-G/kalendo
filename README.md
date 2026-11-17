@@ -9,9 +9,9 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17_+_RLS-4169E1?logo=postgresql&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-deposits-635BFF?logo=stripe&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-unit_+_integration_+_E2E-4d7c0f)
-![Demo](https://img.shields.io/badge/demo-one--click_guest_login-4a2c1d)
+[![Live demo](https://img.shields.io/badge/live_demo-kalendo.arealjagema.com-4a2c1d)](https://kalendo.arealjagema.com)
 
-[Features](#features) · [Design](#design) · [Screenshots](#screenshots) · [Tech stack](#tech-stack) · [Getting started](#getting-started)
+[Live demo](#live-demo) · [Features](#features) · [Design](#design) · [Screenshots](#screenshots) · [Tech stack](#tech-stack) · [Getting started](#getting-started)
 
 </div>
 
@@ -28,17 +28,11 @@ Kalendo is a multi-tenant booking SaaS. Every business gets a public booking pag
 
 The interesting part is the backend. Tenant isolation is enforced by Postgres Row Level Security, overlapping appointments are rejected by an exclusion constraint, webhooks are idempotent, and every email or refund goes through a transactional outbox. Each of those guarantees has an integration test that runs against real Postgres.
 
-## Try the demo
+## Live demo
 
-Run it locally (see [Getting started](#getting-started)) with `DEMO_MODE=1` and click **Try the demo** on the landing page. You are signed straight into **Glow Studio**, a fictional salon with about five weeks of bookings, three staff members and a customer list. No password, no sign-up.
+Open **[kalendo.arealjagema.com](https://kalendo.arealjagema.com)** and click **Try the demo** to land in **Glow Studio**, a fictional salon with about five weeks of bookings, three staff members and a customer list. The demo is built from the [`demo`](https://github.com/Areal-G/kalendo/tree/demo) branch and runs on in-memory data; this branch is the full app.
 
-| What | Where |
-| --- | --- |
-| Dashboard (owner) | `/sign-in` with `demo@kalendo.dev` / `kalendo-demo-2026` |
-| Dashboard (admin) | `admin@kalendo.dev` / `kalendo-demo-2026` |
-| Public booking page | `/b/glow-studio` (New York) and `/b/northside-physio` (Chicago) |
-
-In demo mode payments use the built-in signed fake checkout and emails are printed to the server log, so nothing needs credentials.
+To explore the same data locally, run `npm run seed` (see [Getting started](#getting-started)) and sign in with the seed owner. The public booking pages are `/b/glow-studio` (New York) and `/b/northside-physio` (Chicago).
 
 ## Features
 
@@ -120,9 +114,9 @@ Invitations by email, owner/admin/staff roles enforced on the server, and weekly
 
 | | |
 | --- | --- |
-| <img src="readme/landing.png" width="440" alt="Landing page"><br>**Landing page.** One-click demo and a preview of the product. | <picture><source media="(prefers-color-scheme: dark)" srcset="readme/hero-dark.png"><img alt="Dashboard overview" src="readme/hero-light.png" width="440"></picture><br>**Overview.** Today's schedule, week chart, revenue and the booking-page link. |
+| <img src="readme/landing.png" width="440" alt="Landing page"><br>**Landing page.** Features, pricing and a preview of the product. | <picture><source media="(prefers-color-scheme: dark)" srcset="readme/hero-dark.png"><img alt="Dashboard overview" src="readme/hero-light.png" width="440"></picture><br>**Overview.** Today's schedule, week chart, revenue and the booking-page link. |
 
-All screenshots come from the running app with the seeded Glow Studio demo: desktop at 1440×900 and mobile at 390×844, both at retina resolution. Images switch to dark versions when GitHub is in dark mode.
+All screenshots come from the running app with the seeded Glow Studio sample data: desktop at 1440×900 and mobile at 390×844, both at retina resolution. Images switch to dark versions when GitHub is in dark mode.
 
 ## Tech stack
 
@@ -195,7 +189,6 @@ flowchart LR
 - **Two-phase deposit checkout.** The hold commits before the Stripe call, so no transaction or row lock is held across the network.
 - **Time zones done properly.** Opening hours are wall-clock times in the business's IANA zone, bookings are `timestamptz`, and the engine takes `now` as an argument. Spring-forward gaps are skipped and fall-back hours are offered twice as distinct instants.
 - **Payments behind an interface.** Without Stripe keys a fake provider signs its own events and posts them through the same verify-and-apply pipeline, so deposits work end to end with zero credentials.
-- **Demo mode** (`DEMO_MODE=1`) adds one-click sign-in, forces the fake payment provider, logs emails instead of sending them, drains the outbox after each request and enables a nightly reset endpoint for Vercel Cron.
 
 ## Engineering highlights
 
@@ -271,7 +264,7 @@ npm run db:migrate
 npm run seed
 ```
 
-`db:migrate` applies the SQL migrations and creates the restricted app role from `DATABASE_URL`. `seed` creates two demo businesses with bookings from three weeks back to two weeks ahead.
+`db:migrate` applies the SQL migrations and creates the restricted app role from `DATABASE_URL`. `seed` creates two sample businesses with bookings from three weeks back to two weeks ahead, both owned by one login: `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` (defaults: `owner@example.com` / `kalendo-local-password`). It skips when that owner already exists and refuses to run with `NODE_ENV=production`.
 
 ```bash
 npm run dev
@@ -287,6 +280,8 @@ The app runs on http://localhost:3000 together with the outbox worker. Use `npm 
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Connection string for the restricted app role. RLS always applies to it. |
 | `DATABASE_ADMIN_URL` | Yes | Privileged connection used only for migrations, seeding, reset and test setup. |
+| `DATABASE_URL_UNPOOLED`, `DATABASE_APP_PASSWORD` | No | Neon integration: derive both connections from the owner URLs and the app role's password. |
+| `DATABASE_POOLED` | No | `1` disables prepared statements for a transaction-mode pooler (automatic on `-pooler` hosts). |
 | `BETTER_AUTH_SECRET` | Yes | Session signing secret, at least 32 characters (`openssl rand -base64 32`). |
 | `BETTER_AUTH_URL` | Yes | Public base URL used by auth callbacks. |
 | `NEXT_PUBLIC_APP_URL` | Yes | Public base URL used in links and emails. |
@@ -297,8 +292,9 @@ The app runs on http://localhost:3000 together with the outbox worker. Use `npm 
 | `STRIPE_WEBHOOK_SECRET` | With Stripe | Signing secret from the Stripe dashboard or `stripe listen`. |
 | `STRIPE_PRO_PRICE_ID` | With Stripe | Recurring price for the Pro plan upgrade. |
 | `FAKE_PAYMENTS_WEBHOOK_SECRET` | No | HMAC secret for the fake provider's webhooks. |
-| `DEMO_MODE` | No | `1` turns on the public demo behaviour described above. |
-| `CRON_SECRET` | For cron | Bearer token for `/api/cron/outbox` and `/api/demo/reset`. Without it both reject every call. |
+| `CRON_SECRET` | For cron | Bearer token for `/api/cron/outbox`. Without it the endpoint rejects every call. |
+| `WORKER_POLL_MS` | No | Outbox poll interval of `npm run worker` (default 1000). |
+| `SEED_OWNER_NAME`, `SEED_OWNER_EMAIL`, `SEED_OWNER_PASSWORD` | No | Login that owns the sample businesses created by `npm run seed`. |
 
 </details>
 
@@ -324,7 +320,7 @@ Put the printed `whsec_...` in `STRIPE_WEBHOOK_SECRET`, add a test-mode `STRIPE_
 | `npm run worker` | The outbox worker on its own (for production). |
 | `npm run db:migrate` | Apply SQL migrations and provision the app role. |
 | `npm run db:reset` | Drop everything and migrate again. |
-| `npm run seed` | Seed the two demo businesses. |
+| `npm run seed` | Seed the two sample businesses. |
 | `npm run db:generate` | Generate a migration from the Drizzle schema. |
 | `npm run typecheck` / `lint` / `format` | TypeScript, ESLint, Prettier. |
 | `npm test` | Unit tests. |
@@ -339,7 +335,7 @@ Put the printed `whsec_...` in `STRIPE_WEBHOOK_SECRET`, add a test-mode `STRIPE_
 
 ```
 drizzle/                 SQL migrations: schema, RLS policies, roles, exclusion constraint
-scripts/                 migrate, reset, seed, deploy-db (build-time migrate + demo seed)
+scripts/                 migrate, reset, seed, deploy-db (build-time migrate)
 src/
   app/
     page.tsx             marketing landing page
@@ -347,7 +343,7 @@ src/
     onboarding/ invite/  create a business, accept an invitation
     app/[org]/           dashboard: overview, calendar, bookings, customers, services, team, settings
     b/[org]/             public booking page, booking status and cancel, fake checkout
-    api/                 auth, public availability and bookings, webhooks, cron, demo sign-in/reset
+    api/                 auth, public availability and bookings, webhooks, cron
   components/            UI primitives, booking widget, dashboard shell, brand
   db/schema.ts           Drizzle schema with composite foreign keys
   lib/availability/      the pure availability engine and its tests
@@ -358,7 +354,7 @@ src/
     services/            bookings, availability, team, catalog, customers, schedule
     payments/            provider interface, Stripe adapter, signed fake, webhook handling
     outbox/ mail/        outbox topics and backoff, mailer and email templates
-    demo/                demo mode, seed data, nightly reset
+    seed.ts              sample data for `npm run seed`
   worker/                outbox processor and main loop
   proxy.ts               optimistic auth gate (Next 16 middleware)
 tests/
@@ -387,10 +383,10 @@ npm run typecheck
 The app targets Vercel with a managed Postgres such as Neon, and `vercel.json` already sets the build command and crons.
 
 - Provide two connection strings to the same database: `DATABASE_URL` for the app role on the pooled host, and `DATABASE_ADMIN_URL` for the owner on the direct host. The first build creates the app role with the password in `DATABASE_URL`, so make it long and random. With the Neon integration you can set `DATABASE_APP_PASSWORD` instead and the URLs are derived for you.
-- `npm run vercel-build` applies migrations (and seeds an empty database in demo mode) before `next build`.
-- Set `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET` and either the Stripe variables or `DEMO_MODE=1`.
-- Crons: `/api/demo/reset` daily at 06:00 UTC and `/api/cron/outbox` as a daily safety net. On a plan that allows it, run the outbox every few minutes so reminders go out on time, or run `npm run worker` as a long-lived process.
-- Outside demo mode, configure Stripe before going live. Without a key the app falls back to the fake provider.
+- `npm run vercel-build` applies migrations before `next build`.
+- Set `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET` and the Stripe variables.
+- Crons: `/api/cron/outbox` daily as a safety net. On a plan that allows it, run the outbox every few minutes so reminders go out on time, or run `npm run worker` as a long-lived process.
+- Configure Stripe before going live. Without a key the app falls back to the fake provider.
 
 ## Roadmap
 

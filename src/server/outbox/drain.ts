@@ -1,6 +1,3 @@
-import { after } from "next/server";
-
-import { isDemoMode } from "@/server/demo/mode";
 import { getMailer } from "@/server/mail/mailer";
 import { getPaymentProvider } from "@/server/payments";
 import { createHandlers } from "@/worker/handlers";
@@ -26,20 +23,4 @@ export async function drainOutbox(
     if (result.claimed === 0) break;
   }
   return { maintenance, batches };
-}
-
-/**
- * In demo mode there is no worker, so after a request that may have enqueued
- * messages, deliver them once the response is sent (`after`). The cron route
- * is the safety net for anything this misses (e.g. reminders that come due).
- */
-export function drainOutboxAfterResponse(): void {
-  if (!isDemoMode()) return;
-  after(async () => {
-    try {
-      await drainOutbox({ batches: 1 });
-    } catch (err) {
-      console.error("[outbox] in-request drain failed", err);
-    }
-  });
 }

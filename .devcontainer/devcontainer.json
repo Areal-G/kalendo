@@ -7,7 +7,7 @@
   "shutdownAction": "stopCompose",
   "forwardPorts": [3000, "mailpit:8025"],
   "portsAttributes": {
-    "3000": { "label": "Kalendo (demo mode)", "onAutoForward": "openPreview" },
+    "3000": { "label": "Kalendo", "onAutoForward": "openPreview" },
     "mailpit:8025": { "label": "Mailpit (emails)", "onAutoForward": "silent" }
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isAuthorizedCron } from "@/server/demo/cron-auth";
+import { isAuthorizedCron } from "@/server/cron-auth";
 import { drainOutbox } from "@/server/outbox/drain";
 
 export const dynamic = "force-dynamic";

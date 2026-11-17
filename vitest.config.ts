@@ -43,7 +43,6 @@ export default defineConfig({
             BETTER_AUTH_SECRET:
               process.env.BETTER_AUTH_SECRET ?? "integration-tests-only-secret-0123456789abcdef",
             BETTER_AUTH_URL: "http://localhost:3000",
-            DEMO_MODE: "",
             CRON_SECRET: "",
           },
           // Tests share one database; files run sequentially, tests inside a

@@ -1,4 +1,3 @@
-import { isDemoMode } from "../demo/mode";
 import { FakePaymentProvider } from "./fake";
 import { StripePaymentProvider } from "./stripe";
 import type { PaymentProvider } from "./types";
@@ -8,12 +7,12 @@ export * from "./types";
 const globalForPayments = globalThis as unknown as { __kalendoPayments?: PaymentProvider };
 
 /**
- * Stripe when keys are configured (and not in demo mode), otherwise the local fake. The choice is
- * made once per process; nothing else in the app branches on it.
+ * Stripe when keys are configured, otherwise the local fake. The choice is made once per process;
+ * nothing else in the app branches on it.
  */
 export function getPaymentProvider(): PaymentProvider {
   if (!globalForPayments.__kalendoPayments) {
-    const key = isDemoMode() ? undefined : process.env.STRIPE_SECRET_KEY;
+    const key = process.env.STRIPE_SECRET_KEY;
     globalForPayments.__kalendoPayments = key
       ? new StripePaymentProvider(
           key,

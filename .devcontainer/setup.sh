@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup for Codespaces / Dev Containers: .env, deps, schema, demo data.
+# One-time setup for Codespaces / Dev Containers: .env, deps, schema, sample data.
 # No secrets needed: everything points at the throwaway containers.
 set -euo pipefail
 
@@ -16,8 +16,6 @@ DATABASE_ADMIN_URL=postgres://postgres:postgres@localhost:5432/kalendo
 BETTER_AUTH_SECRET=$(openssl rand -base64 32)
 BETTER_AUTH_URL=${APP_URL}
 NEXT_PUBLIC_APP_URL=${APP_URL}
-DEMO_MODE=1
-# Demo mode would only log emails; in the container we have Mailpit (port 8025).
 MAIL_TRANSPORT=smtp
 SMTP_HOST=mailpit
 SMTP_PORT=1025
