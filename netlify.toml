@@ -1,0 +1,16 @@
+# Portfolio demo build: in-memory data (PGlite), no database or external
+# services. The only variable to set in the Netlify UI is BETTER_AUTH_SECRET.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # Inlined at build time: links, the fake checkout and the auth base URL.
+  NEXT_PUBLIC_APP_URL = "https://kalendo.arealjagema.com"
+
+[functions]
+  # Read from disk at runtime, so bundling alone would miss them: the database
+  # snapshot made by the build, and PGlite's WebAssembly and extension files.
+  included_files = [".demo/**", "node_modules/@electric-sql/pglite/dist/**"]

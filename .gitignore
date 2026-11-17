@@ -3,6 +3,8 @@ node_modules/
 
 # next
 .next/
+# demo database snapshot, made by `npm run build`
+.demo/
 out/
 next-env.d.ts
 *.tsbuildinfo

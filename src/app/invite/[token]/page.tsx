@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Join a team" };
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const user = await requireUser(`/invite/${token}`);
-  const rows = await getDb().execute<{ org_id: string | null }>(
+  const { rows } = await getDb().execute<{ org_id: string | null }>(
     sql`select app.invitation_org_id(${hashToken(token)}) as org_id`,
   );
   const valid = Boolean(rows[0]?.org_id);

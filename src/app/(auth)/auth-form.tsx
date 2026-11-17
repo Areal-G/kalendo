@@ -18,7 +18,7 @@ function safeNext(value: string | null): string {
 }
 
 const DEMO_ERRORS: Record<string, string> = {
-  unavailable: "The demo account isn't available right now. It's restored every night.",
+  unavailable: "The demo account isn't available right now. Please try again in a moment.",
   busy: "Too many demo sign-ins from your network. Try again in a few minutes.",
 };
 

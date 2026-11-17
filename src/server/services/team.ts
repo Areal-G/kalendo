@@ -99,7 +99,7 @@ export async function acceptInvitation(
   user: { id: string; email: string; name: string },
 ): Promise<{ orgId: string }> {
   const tokenHash = hashToken(token);
-  const rows = await getDb().execute<{ org_id: string | null }>(
+  const { rows } = await getDb().execute<{ org_id: string | null }>(
     sql`select app.invitation_org_id(${tokenHash}) as org_id`,
   );
   const orgId = rows[0]?.org_id;

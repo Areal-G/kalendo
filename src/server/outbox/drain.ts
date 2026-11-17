@@ -1,14 +1,13 @@
 import { after } from "next/server";
 
-import { isDemoMode } from "@/server/demo/mode";
 import { getMailer } from "@/server/mail/mailer";
 import { getPaymentProvider } from "@/server/payments";
 import { createHandlers } from "@/worker/handlers";
 import { type BatchResult, processOutboxBatch, runMaintenance } from "@/worker/processor";
 
 /**
- * One worker tick, for platforms without a long-running process (Vercel):
- * housekeeping, then deliver whatever is due. Same code path as the worker.
+ * One worker tick: housekeeping, then deliver whatever is due. Same code path
+ * as the worker on the full app.
  */
 export async function drainOutbox(
   options: { batches?: number } = {},
@@ -29,12 +28,10 @@ export async function drainOutbox(
 }
 
 /**
- * In demo mode there is no worker, so after a request that may have enqueued
- * messages, deliver them once the response is sent (`after`). The cron route
- * is the safety net for anything this misses (e.g. reminders that come due).
+ * The demo has no worker, so after a request that may have enqueued messages,
+ * deliver them once the response is sent (`after`).
  */
 export function drainOutboxAfterResponse(): void {
-  if (!isDemoMode()) return;
   after(async () => {
     try {
       await drainOutbox({ batches: 1 });

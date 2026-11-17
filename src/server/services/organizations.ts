@@ -16,15 +16,16 @@ export const DEFAULT_HOURS = [1, 2, 3, 4, 5].map((weekday) => ({
 }));
 
 /**
- * Creates an organization with its owner. The id is generated up front so the
- * RLS context can be set *before* the first insert: the organizations INSERT
- * policy only accepts rows whose id equals app.current_org.
+ * Creates an organization with its owner. The id is generated up front (the
+ * demo seed passes fixed ones) so the RLS context can be set *before* the
+ * first insert: the organizations INSERT policy only accepts rows whose id
+ * equals app.current_org.
  */
 export async function createOrganization(
   user: { id: string; name: string; email: string },
   input: CreateOrganizationInput,
+  orgId: string = randomUUID(),
 ): Promise<{ id: string; slug: string }> {
-  const orgId = randomUUID();
   const ctx: TenantContext = { orgId, userId: user.id };
   try {
     return await withTenant(ctx, async (tx) => {

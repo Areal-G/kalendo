@@ -33,7 +33,7 @@ export async function hitRateLimit(
   nowMs = Date.now(),
 ): Promise<RateLimitResult> {
   const start = windowStart(nowMs, rule.windowSeconds);
-  const rows = await getDb().execute<{ count: number }>(sql`
+  const { rows } = await getDb().execute<{ count: number }>(sql`
     insert into rate_limits (key, window_start, count)
     values (${key}, ${start.toISOString()}, 1)
     on conflict (key, window_start) do update set count = rate_limits.count + 1
@@ -60,13 +60,6 @@ export async function enforceRateLimit(
     });
   }
   return result;
-}
-
-/** Housekeeping, run by the worker. */
-export async function purgeExpiredRateLimits(olderThan: Date): Promise<void> {
-  await getDb().execute(
-    sql`delete from rate_limits where window_start < ${olderThan.toISOString()}`,
-  );
 }
 
 export const RATE_LIMITS = {

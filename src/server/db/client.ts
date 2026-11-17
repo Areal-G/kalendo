@@ -1,57 +1,49 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import type { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
 
 import * as schema from "@/db/schema";
+import { demoClient, waitForDemoData } from "@/server/demo/data";
 
-import { applyManagedPostgresEnv } from "./managed-env";
+/**
+ * The demo runs on PGlite: real Postgres compiled to WebAssembly, in memory,
+ * with the real migrations, Row Level Security and exclusion constraint. Each
+ * server instance has its own copy (see demo/data.ts).
+ *
+ * The app's handle waits until the data is ready before every query, so
+ * nothing observes a half-loaded or half-reset database. Loads themselves run
+ * inside a data task and skip the wait.
+ */
+const GATED = new Set<PropertyKey>(["query", "exec", "transaction"]);
 
-export type Database = ReturnType<typeof createDatabase>["db"];
+const demoDatabaseHandle = new Proxy({} as PGlite, {
+  get(_, property) {
+    if (GATED.has(property)) {
+      return async (...args: unknown[]) => {
+        await waitForDemoData();
+        const client = demoClient();
+        return (Reflect.get(client, property) as (...a: unknown[]) => unknown).apply(client, args);
+      };
+    }
+    const client = demoClient();
+    const value: unknown = Reflect.get(client, property, client);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
+
+function createDatabase() {
+  return drizzle({ client: demoDatabaseHandle, schema });
+}
+
+export type Database = ReturnType<typeof createDatabase>;
 export type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 /** Either the root handle or a transaction - for helpers that work in both. */
 export type Queryable = Database | Tx;
 
-/**
- * Managed-Postgres URLs (Neon) may carry `channel_binding`, which postgres.js
- * would forward to the server as an unknown runtime parameter. TLS still comes
- * from `sslmode`.
- */
-export function normalizeDatabaseUrl(url: string): string {
-  const parsed = new URL(url);
-  if (!parsed.searchParams.has("channel_binding")) return url;
-  parsed.searchParams.delete("channel_binding");
-  return parsed.toString();
-}
-
-/** PgBouncer-style poolers in transaction mode (Neon's `-pooler` host) can't keep named prepared statements. */
-export function isPooledUrl(url: string): boolean {
-  return new URL(url).hostname.includes("-pooler") || process.env.DATABASE_POOLED === "1";
-}
-
-export function createDatabase(url: string, options: { max?: number } = {}) {
-  const client = postgres(normalizeDatabaseUrl(url), {
-    max: options.max ?? (process.env.VERCEL ? 5 : 10),
-    prepare: !isPooledUrl(url),
-    // Silence NOTICE messages (e.g. "relation already exists, skipping").
-    onnotice: () => {},
-  });
-  return { client, db: drizzle(client, { schema }) };
-}
-
-// One pool per process. In dev, Next.js hot reload re-evaluates modules, so
-// the pool lives on globalThis to avoid leaking connections on every edit.
-const globalForDb = globalThis as unknown as { __kalendoDb?: ReturnType<typeof createDatabase> };
+// One handle per process. In dev, Next.js hot reload re-evaluates modules, so
+// it lives on globalThis to survive edits.
+const globalForDb = globalThis as unknown as { __kalendoDb?: Database };
 
 export function getDb(): Database {
-  if (!globalForDb.__kalendoDb) {
-    applyManagedPostgresEnv();
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL is not set");
-    globalForDb.__kalendoDb = createDatabase(url);
-  }
-  return globalForDb.__kalendoDb.db;
-}
-
-export async function closeDb(): Promise<void> {
-  await globalForDb.__kalendoDb?.client.end({ timeout: 5 });
-  globalForDb.__kalendoDb = undefined;
+  globalForDb.__kalendoDb ??= createDatabase();
+  return globalForDb.__kalendoDb;
 }

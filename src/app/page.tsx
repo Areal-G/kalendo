@@ -14,7 +14,6 @@ import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { DemoSignInButton } from "@/components/demo/demo-sign-in-button";
 import { Button } from "@/components/ui/button";
-import { isDemoMode } from "@/server/demo/mode";
 
 const nav = [
   { href: "#features", label: "Features" },
@@ -138,15 +137,7 @@ function TryDemo({
   size?: "sm" | "default" | "lg";
   label?: string;
 }) {
-  return isDemoMode() ? (
-    <DemoSignInButton size={size}>{label}</DemoSignInButton>
-  ) : (
-    <Button size={size} asChild>
-      <Link href="/sign-up">
-        Get started free <ArrowRight />
-      </Link>
-    </Button>
-  );
+  return <DemoSignInButton size={size}>{label}</DemoSignInButton>;
 }
 
 /** Section heading in the reference style: typewriter title, quiet sans subtitle. */
@@ -481,17 +472,9 @@ export default function LandingPage() {
                 sign-up, no credit card.
               </p>
               <div className="mt-8 flex justify-center">
-                {isDemoMode() ? (
-                  <DemoSignInButton size="lg" variant="outline" className="text-foreground">
-                    Try the demo
-                  </DemoSignInButton>
-                ) : (
-                  <Button size="lg" variant="outline" className="text-foreground" asChild>
-                    <Link href="/sign-up">
-                      Get started free <ArrowRight />
-                    </Link>
-                  </Button>
-                )}
+                <DemoSignInButton size="lg" variant="outline" className="text-foreground">
+                  Try the demo
+                </DemoSignInButton>
               </div>
             </section>
           </main>

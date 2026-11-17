@@ -18,8 +18,8 @@ const nextConfig: NextConfig = {
   typedRoutes: false,
   // Pin the workspace root so a lockfile in a parent directory is never picked up.
   turbopack: { root: process.cwd() },
-  // postgres.js and nodemailer are server-only Node libraries.
-  serverExternalPackages: ["postgres", "nodemailer"],
+  // Server-only Node libraries; PGlite also loads its WebAssembly from its own package directory.
+  serverExternalPackages: ["@electric-sql/pglite", "nodemailer"],
   ...(codespacesDomain
     ? {
         allowedDevOrigins: [`*.${codespacesDomain}`],

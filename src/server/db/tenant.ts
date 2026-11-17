@@ -42,7 +42,7 @@ export async function withUser<T>(userId: string, fn: (tx: Tx) => Promise<T>): P
 
 /** Resolves a public slug to an org id through the SECURITY DEFINER function. */
 export async function orgIdBySlug(slug: string): Promise<string | null> {
-  const rows = await getDb().execute<{ id: string | null }>(
+  const { rows } = await getDb().execute<{ id: string | null }>(
     sql`select app.org_id_by_slug(${slug}) as id`,
   );
   return rows[0]?.id ?? null;

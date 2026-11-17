@@ -60,7 +60,7 @@ export async function processOutboxBatch(
   handlers: OutboxHandlers,
   options: { batchSize?: number; leaseSeconds?: number; backoff?: BackoffOptions } = {},
 ): Promise<BatchResult> {
-  const rows = await getDb().execute<ClaimRow>(
+  const { rows } = await getDb().execute<ClaimRow>(
     sql`select * from app.claim_outbox(${options.batchSize ?? 20}, ${options.leaseSeconds ?? 60})`,
   );
   const result: BatchResult = { claimed: rows.length, succeeded: 0, retried: 0, dead: 0 };
@@ -147,9 +147,11 @@ async function markFailed(
 /** Periodic housekeeping across tenants, via the SECURITY DEFINER functions. */
 export async function runMaintenance(): Promise<{ expiredHolds: number; deadLettered: number }> {
   const db = getDb();
-  const [holds] = await db.execute<{ n: number }>(sql`select app.expire_stale_holds() as n`);
-  const [dead] = await db.execute<{ n: number }>(
-    sql`select app.dead_letter_exhausted_outbox() as n`,
-  );
+  const {
+    rows: [holds],
+  } = await db.execute<{ n: number }>(sql`select app.expire_stale_holds() as n`);
+  const {
+    rows: [dead],
+  } = await db.execute<{ n: number }>(sql`select app.dead_letter_exhausted_outbox() as n`);
   return { expiredHolds: holds?.n ?? 0, deadLettered: dead?.n ?? 0 };
 }

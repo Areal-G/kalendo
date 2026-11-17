@@ -4,10 +4,11 @@
  * services (and therefore through RLS and the availability engine), so the
  * seed doubles as a smoke test of the write path.
  *
- * Used by `npm run seed` and by the nightly demo reset (`/api/demo/reset`).
+ * Seeded at build time into the snapshot every instance loads, or on first use
+ * without one (see ./data.ts). It must be deterministic: same date, same rows,
+ * same ids.
  */
 import { eq } from "drizzle-orm";
-import type { Sql } from "postgres";
 import { Temporal } from "temporal-polyfill";
 
 import {
@@ -40,7 +41,7 @@ function mulberry32(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-// Re-created on every run so a warm serverless instance reseeds identically.
+// Re-created on every run so every load is identical.
 let random = mulberry32(20261014);
 const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
 
@@ -121,6 +122,8 @@ const days = (list: number[], start: string, end: string): Hours =>
   list.map((weekday) => ({ weekday, start, end }));
 
 interface OrgSpec {
+  /** Fixed, so that links and sessions work across instances. */
+  id: string;
   name: string;
   slug: string;
   timeZone: string;
@@ -142,6 +145,7 @@ interface OrgSpec {
 
 const SPECS: OrgSpec[] = [
   {
+    id: "00000000-0000-4000-9000-000000000001",
     name: "Glow Studio",
     slug: DEMO_ORG_SLUG,
     timeZone: "America/New_York",
@@ -205,6 +209,7 @@ const SPECS: OrgSpec[] = [
     bookingsPerDay: 5,
   },
   {
+    id: "00000000-0000-4000-9000-000000000002",
     name: "Northside Physio",
     slug: "northside-physio",
     timeZone: "America/Chicago",
@@ -246,14 +251,17 @@ const SPECS: OrgSpec[] = [
   },
 ];
 
-async function seedOrg(spec: OrgSpec, customers: ReturnType<typeof makeCustomers>) {
+async function seedOrg(
+  spec: OrgSpec,
+  customers: ReturnType<typeof makeCustomers>,
+  today: Temporal.PlainDate,
+) {
   const owner = await createUser(spec.owner.name, spec.owner.email);
-  const { id: orgId } = await createOrganization(owner, {
-    name: spec.name,
-    slug: spec.slug,
-    timeZone: spec.timeZone,
-    currency: spec.currency,
-  });
+  const { id: orgId } = await createOrganization(
+    owner,
+    { name: spec.name, slug: spec.slug, timeZone: spec.timeZone, currency: spec.currency },
+    spec.id,
+  );
   const admin = spec.admin ? await createUser(spec.admin.name, spec.admin.email) : null;
 
   await withTenant({ orgId, userId: owner.id }, async (tx) => {
@@ -322,15 +330,13 @@ async function seedOrg(spec: OrgSpec, customers: ReturnType<typeof makeCustomers
         .insert(staffServices)
         .values(performers.map((staffId) => ({ orgId, staffId, serviceId: row!.id })));
     }
-    const year = Temporal.Now.plainDateISO(spec.timeZone).year;
     await tx
       .insert(holidays)
-      .values({ orgId, date: `${year}-12-25`, name: "Christmas Day" })
+      .values({ orgId, date: `${today.year}-12-25`, name: "Christmas Day" })
       .onConflictDoNothing();
   });
 
   // Bookings: three weeks back, two weeks ahead, placed only where the engine says it's free.
-  const today = Temporal.Now.plainDateISO(spec.timeZone);
   let created = 0;
   for (let d = -21; d <= 14; d++) {
     const date = today.add({ days: d }).toString();
@@ -381,27 +387,17 @@ async function seedOrg(spec: OrgSpec, customers: ReturnType<typeof makeCustomers
 }
 
 export interface SeedResult {
-  seeded: boolean;
   orgs: { name: string; slug: string; bookings: number }[];
 }
 
-/**
- * Seeds the demo tenants unless the demo owner already exists. `admin` is a
- * privileged connection (migration owner): it is only used to check for
- * existing data and to mark seed-time outbox messages as handled.
- */
-export async function seedDemoData(admin: Sql): Promise<SeedResult> {
-  const existing = await admin`select 1 from auth_users where email = ${DEMO_OWNER_EMAIL}`;
-  if (existing.length > 0) return { seeded: false, orgs: [] };
-
+/** Seeds the demo tenants into an empty database, with the calendar around `today`. */
+export async function seedDemoData(today: Temporal.PlainDate): Promise<SeedResult> {
   random = mulberry32(20261014);
   const customers = makeCustomers();
   const orgs: SeedResult["orgs"] = [];
   for (const spec of SPECS) {
-    const { created } = await seedOrg(spec, customers);
+    const { created } = await seedOrg(spec, customers, today);
     orgs.push({ name: spec.name, slug: spec.slug, bookings: created });
   }
-  // Don't email fictional customers about historical bookings.
-  await admin`update outbox set status = 'done', processed_at = now(), last_error = 'skipped by seed'`;
-  return { seeded: true, orgs };
+  return { orgs };
 }

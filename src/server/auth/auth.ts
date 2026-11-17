@@ -7,9 +7,10 @@ import { authAccounts, authSessions, authUsers, authVerifications } from "@/db/s
 import { env } from "@/env";
 
 import { getDb } from "../db/client";
-import { isDemoMode } from "../demo/mode";
 import { getMailer } from "../mail/mailer";
 import { magicLinkEmail } from "../mail/templates";
+
+const SESSION_SECONDS = 60 * 60 * 24 * 14;
 
 function createAuth() {
   const config = env();
@@ -17,18 +18,19 @@ function createAuth() {
     appName: "Kalendo",
     secret: config.BETTER_AUTH_SECRET,
     baseURL: config.BETTER_AUTH_URL,
-    // In the public demo everyone shares one account: nobody gets to lock the
-    // others out by changing its password or email (the app has no UI for these).
-    disabledPaths: isDemoMode()
-      ? [
-          "/change-password",
-          "/change-email",
-          "/update-user",
-          "/delete-user",
-          "/revoke-sessions",
-          "/revoke-other-sessions",
-        ]
-      : [],
+    // Everyone shares one account: nobody gets to lock the others out by
+    // changing its password or email (the app has no UI for these). Accounts
+    // can't outlive the in-memory data, so there is no sign-up either.
+    disabledPaths: [
+      "/sign-up/email",
+      "/sign-in/magic-link",
+      "/change-password",
+      "/change-email",
+      "/update-user",
+      "/delete-user",
+      "/revoke-sessions",
+      "/revoke-other-sessions",
+    ],
     database: drizzleAdapter(getDb(), {
       provider: "pg",
       schema: {
@@ -44,11 +46,16 @@ function createAuth() {
       maxPasswordLength: 128,
       autoSignIn: true,
     },
+    // Every instance has its own in-memory database, so a session row exists
+    // only where it was created. The signed cookie cache carries the session
+    // instead, for its whole lifetime; user ids are the same everywhere.
     session: {
-      expiresIn: 60 * 60 * 24 * 14,
+      expiresIn: SESSION_SECONDS,
       updateAge: 60 * 60 * 24,
-      cookieCache: { enabled: true, maxAge: 60 * 5 },
+      cookieCache: { enabled: true, maxAge: SESSION_SECONDS },
     },
+    // Let the database assign ids, from the deterministic sequence (demo/data.ts).
+    advanced: { database: { generateId: false } },
     rateLimit: {
       enabled: true,
       window: 60,

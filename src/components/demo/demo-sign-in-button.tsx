@@ -4,7 +4,7 @@ import { Button, type ButtonProps } from "@/components/ui/button";
 
 /**
  * A plain form POST (works without JS). The session is created server-side by
- * /api/demo/sign-in, which only exists when DEMO_MODE=1.
+ * /api/demo/sign-in.
  */
 export function DemoSignInButton({
   children = "Try the demo",
